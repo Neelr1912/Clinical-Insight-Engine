@@ -75,6 +75,17 @@ export function AppLayout({ children }: AppLayoutProps) {
             </nav>
           </div>
 
+           <div className="m-4 border-t border-slate-100 pt-4">
+           
+            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
+              <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-blue-700 font-black text-sm border border-slate-100 shadow-sm">
+                {user?.name?.charAt(0) || "Dr"}
+              </div>
+              <div className="flex min-w-0 flex-col">
+                <span className="text-sm font-black text-[#1E293B] leading-tight">{user?.name || user?.email}</span>
+                <span className="text-xs text-slate-500 font-semibold">Cardiology</span>
+              </div>
+            </div>
           </div>
 
           <div className="m-4 border-t border-slate-100 dark:border-gray-800 pt-4">
