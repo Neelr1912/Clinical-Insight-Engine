@@ -13,8 +13,9 @@ import {
 import type { RiskCategory } from "./validation/searchValidation";
 
 export interface IStorage {
-  getAssessments(limit?: number, offset?: number, createdBy?: string): Promise<{ data: Assessment[]; total: number; page: number; totalPages: number }>;
-  /**
+  getAssessments(limit?: number, offset?: number, createdBy?: string): Promise<Assessment[]>;
+  createAssessment(assessment: AssessmentCreateInput): Promise<Assessment>;
+ /**
    * Searches assessments by risk category label using parameterized queries.
    * Uses Drizzle ORM eq() — user input is NEVER interpolated into SQL strings.
    */
@@ -27,7 +28,7 @@ export interface IStorage {
   ): Promise<Assessment[]>;
   /** Returns a single assessment by numeric ID. Authorization must be checked by caller. */
   getAssessmentById(id: number): Promise<Assessment | undefined>;
-  createAssessment(assessment: any): Promise<Assessment>;
+  createAssessment(assessment: AssessmentCreateInput): Promise<Assessment>;
   createUser(data: InsertUser): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;
@@ -53,7 +54,11 @@ export class DatabaseStorage implements IStorage {
   ): Promise<{ data: Assessment[]; total: number; page: number; totalPages: number }> {
     const db = getDb();
 
-    const filters: any[] = [];
+    // Compatibility: allow running even if the assessments table doesn't have created_by.
+    // Keep createdBy arg unused for now.
+    void createdBy;
+
+    const filters: ReturnType<typeof eq>[] = [];
 
     // Filter by createdBy when provided to ensure users only see their own assessments
     if (createdBy) {
@@ -218,7 +223,7 @@ export class DatabaseStorage implements IStorage {
 
     const [created] = await db
       .insert(assessments)
-      .values(assessment as any)
+      .values(assessment)
       .returning();
 
     return created;
