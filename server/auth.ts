@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { randomInt } from "crypto";
+import { randomInt, randomBytes } from "crypto";
 import bcrypt from "bcrypt";
 import { rateLimit } from "express-rate-limit";
 import { eq, and, gte } from "drizzle-orm";
@@ -121,13 +121,7 @@ const verifyEmailLimiter = rateLimit({
   message: { error: "Too many verification attempts. Please try again later." },
 });
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 15,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: { error: "Too many login/registration attempts. Please try again in 15 minutes." },
-});
+
 
 const resendLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -341,9 +335,6 @@ export function createAuthRouter(): Router {
           }
         }
       }
-    }
-
-
     if (!userName) {
       await storage.recordLoginAudit({
         ipAddress: req.ip,
@@ -406,14 +397,6 @@ export function createAuthRouter(): Router {
 
     pendingOtps.delete(email);
 
-    const db = getDb();
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
     const devEmail = process.env.DEV_CLINICIAN_EMAIL || "";
 
     let id: string;
@@ -442,9 +425,6 @@ export function createAuthRouter(): Router {
       role = user.role ?? "provider";
       emailVerified = user.emailVerified ?? false;
     }
-    const id = user.id;
-    const name = user.fullName;
-    const role = user.role ?? "provider";
 
     try {
       await establishAuthenticatedSession(req, { id, email, name, role, emailVerified });

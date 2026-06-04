@@ -199,8 +199,8 @@ assessmentsRouter.get(
         });
       }
 
-      const { q, riskCategory, page, limit } = parseResult.data;
-      const offset = (page - 1) * limit;
+      const { q, riskCategory, cursor, limit } = parseResult.data;
+      const offset = cursor ? cursor : 0;
       const userEmail = req.session.user?.email;
 
       if (q) {
