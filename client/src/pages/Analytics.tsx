@@ -44,8 +44,17 @@ export default function Analytics() {
           <div className="text-lg text-muted-foreground animate-pulse">Loading analytics...</div>
         </div>
       ) : error || !stats ? (
-        <div className="flex h-[50vh] items-center justify-center">
-          <div className="text-lg text-destructive">Failed to load analytics data.</div>
+        <div className="flex h-[50vh] flex-col items-center justify-center gap-4">
+          <div className="text-lg text-destructive">Unable to load analytics data.</div>
+          <p className="max-w-md text-center text-sm text-muted-foreground">
+            {error instanceof Error ? error.message : "Please check your connection and try again."}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Retry
+          </button>
         </div>
       ) : stats.totalPatients === 0 ? (
         <div className="space-y-6">

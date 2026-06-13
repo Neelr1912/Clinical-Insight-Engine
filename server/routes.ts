@@ -183,8 +183,7 @@ export async function registerRoutes(
   app.use("/api/auth", authRouter);
   app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", exportsRouter);
-  app.use("/api/assessments", analyticsRouter);
-  app.use("/api/assessments", assessmentsRouter);
+  app.use("/api", analyticsRouter);
   app.post(
     api.assessments.preview.path,
     requireAuth,
@@ -586,25 +585,6 @@ export async function registerRoutes(
     }
   );
 
-  app.get(
-    "/api/assessments/analytics",
-    requireAuth,
-    requireVerified,
-    async (req, res) => {
-      try {
-        const userEmail = req.session.user?.email;
-        if (!userEmail) {
-           return res.status(401).json({ message: "Unauthorized" });
-        }
-        const stats = await storage.getAnalyticsStats(userEmail);
-        return res.json(stats);
-      } catch (err) {
-        logger.error({ err }, "Analytics fetch error:");
-        return res.status(500).json({ message: "Failed to fetch analytics" });
-      }
-    }
-  );
-
   /**
    * GET /api/assessments/patient/:patientName/trends
    *
@@ -728,7 +708,6 @@ export async function registerRoutes(
   // Mount domain-specific routers (after app-level handlers for precedence)
   app.use("/api/assessments", mlRouter);
   app.use("/api/assessments", exportsRouter);
-  app.use("/api/assessments", analyticsRouter);
   app.use("/api/assessments", generalLimiter, assessmentsRouter);
 
   // ─── Admin Routes ────────────────────────────────────────────────
