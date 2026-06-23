@@ -82,6 +82,7 @@ vi.mock("../server/storage", () => {
   const mockStorageInstance = {
     getAssessments: mockGetAssessments,
     createAssessment: mockCreateAssessment,
+    createAssessmentsBatch: vi.fn().mockImplementation(async (batch) => batch.map((item: any, idx: number) => ({ id: idx + 1, ...item, createdAt: new Date() }))),
     searchAssessments: vi.fn().mockResolvedValue([]),
     getAssessmentById: vi.fn().mockResolvedValue(undefined),
     deleteAssessment: vi.fn().mockResolvedValue(undefined),
@@ -257,6 +258,40 @@ describe("Auth gating", () => {
     const res = await request(app).get("/api/assessments");
 
     expect(res.status).toBe(401);
+    expect(res.body).toHaveProperty("message");
+  });
+});
+
+describe("IDOR Prevention", () => {
+  const unauthorizedAssessment = {
+    id: 999,
+    patientName: "Someone Else",
+    createdBy: "other-doctor@example.com",
+    userId: "other-patient-uuid",
+    createdAt: new Date(),
+  };
+
+  it("returns 404 (not 403) for GET /api/assessments/:id on unauthorized record", async () => {
+    const app = createAuthenticatedApp();
+    const module = await import("../server/storage");
+    (module.storage.getAssessmentById as any).mockResolvedValue(unauthorizedAssessment);
+    await registerRoutes(createServer(), app);
+
+    const res = await request(app).get("/api/assessments/999");
+
+    expect(res.status).toBe(404);
+    expect(res.body).toHaveProperty("message");
+  });
+
+  it("returns 404 (not 403) for DELETE /api/assessments/:id on unauthorized record", async () => {
+    const app = createAuthenticatedApp();
+    const module = await import("../server/storage");
+    (module.storage.getAssessmentById as any).mockResolvedValue(unauthorizedAssessment);
+    await registerRoutes(createServer(), app);
+
+    const res = await request(app).delete("/api/assessments/999");
+
+    expect(res.status).toBe(404);
     expect(res.body).toHaveProperty("message");
   });
 });
@@ -711,7 +746,7 @@ describe("DELETE /api/assessments/:id", () => {
     expect(res.status).toBe(404);
   });
 
-  it("returns 403 when user is not authorized to delete the record", async () => {
+  it("returns 404 when user is not authorized to delete the record", async () => {
     const app = createAuthenticatedApp();
     await registerRoutes(createServer(), app);
     const mockStorage = (await import("../server/storage")).storage as any;
@@ -722,7 +757,7 @@ describe("DELETE /api/assessments/:id", () => {
       ownerId: "other-user-id"
     });
     const res = await request(app).delete("/api/assessments/1");
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   it("returns 204 when assessment is deleted successfully", async () => {

@@ -13,55 +13,67 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const analyzePyPath = path.resolve(__dirname, "..", "..", "analyze.py");
 
+interface QueuedEntry {
+  execute: () => void;
+  abort: () => void;
+}
+
 /** A concurrency-limiting semaphore designed to throttle intensive Machine Learning inference tasks and manage server resource boundaries. */
 export class SimpleSemaphore {
   private activeCount = 0;
-  private queue: (() => void)[] = [];
+  private queue: QueuedEntry[] = [];
 
   constructor(private maxConcurrency: number) {}
 
-  /**
-     * Acquire.
-     * @returns The result of the operation.
-     */
-    async acquire(): Promise<() => void> {
+  async acquire(timeoutMs?: number): Promise<() => void> {
     if (this.activeCount < this.maxConcurrency) {
       this.activeCount++;
       return () => this.release();
     }
 
-    return new Promise<() => void>((resolve) => {
-      this.queue.push(() => {
-        resolve(() => this.release());
-      });
+    return new Promise<() => void>((resolve, reject) => {
+      const entry: QueuedEntry = {
+        execute: () => resolve(() => this.release()),
+        abort: () => reject(new Error("Semaphore acquisition aborted")),
+      };
+      this.queue.push(entry);
+
+      if (timeoutMs && timeoutMs > 0) {
+        setTimeout(() => {
+          const idx = this.queue.indexOf(entry);
+          if (idx !== -1) {
+            this.queue.splice(idx, 1);
+            reject(new Error("Semaphore acquisition timed out"));
+          }
+        }, timeoutMs);
+      }
     });
   }
 
-  /**
-     * Release.
-     * @returns The result of the operation.
-     */
-    release(): void {
+  release(): void {
     this.activeCount--;
     const next = this.queue.shift();
     if (next) {
       this.activeCount++;
-      next();
+      next.execute();
     }
   }
 
-  /**
-     * Run.
-     * @param fn - The fn parameter.
-     * @returns The result of the operation.
-     */
-    async run<T>(fn: () => Promise<T>): Promise<T> {
-    const release = await this.acquire();
+  async run<T>(fn: () => Promise<T>, timeoutMs?: number): Promise<T> {
+    const release = await this.acquire(timeoutMs);
     try {
       return await fn();
     } finally {
       release();
     }
+  }
+
+  get pending(): number {
+    return this.queue.length;
+  }
+
+  get active(): number {
+    return this.activeCount;
   }
 }
 
@@ -499,7 +511,7 @@ export async function runAssessmentInference(
   options: InferenceOptions = {}
 ): Promise<{ prediction: PredictionResult; isFallback: boolean }> {
   const { throwOnFailure = false } = options;
-  const release = await mlConcurrency.acquire();
+  const release = await mlConcurrency.acquire(getRequestTimeout());
   const docId = documentId ?? (input as any)?.id ?? (input as any)?.patientName ?? "unknown";
   let attempt = 0;
 
@@ -568,7 +580,7 @@ export async function runAssessmentInferenceBatch(
   options: InferenceOptions = {}
 ): Promise<{ predictions: PredictionResult[]; isFallback: boolean }> {
   const { throwOnFailure = false } = options;
-  const release = await mlConcurrency.acquire();
+  const release = await mlConcurrency.acquire(getRequestTimeout());
   const docId = documentId ?? "batch";
   let attempt = 0;
 

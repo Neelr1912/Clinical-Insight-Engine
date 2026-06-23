@@ -16,6 +16,7 @@ vi.mock("../server/storage", () => {
   const mockStorageInstance = {
     getAssessments: mockGetAssessments,
     createAssessment: mockCreateAssessment,
+    createAssessmentsBatch: vi.fn().mockImplementation(async (batch) => batch.map((item: any, idx: number) => ({ id: idx + 1, ...item, createdAt: new Date() }))),
     searchAssessments: vi.fn().mockResolvedValue([]),
     getAssessmentById: vi.fn().mockResolvedValue(undefined),
     deleteAssessment: vi.fn().mockResolvedValue(undefined),
